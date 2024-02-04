@@ -6,6 +6,7 @@
 """
 
 import paho.mqtt.client as paho
+import paho.mqtt.publish as publish
 import time as Ti
 
 """
@@ -18,14 +19,22 @@ receiverTopic = "Sistema/Receiver"
 alertTopic = "Sistema/Alert"
 
 
-msgs = "45.252,-75.563,95,120,60,90," + date
+msgs = [{'topic': receiverTopic, 'payload':"45.252,-75.541,95,120,60,90, date: " + date},
+        {'topic': receiverTopic, 'payload':"45.252,-73.343,85,110,60,90, date: " + date},
+        {'topic': receiverTopic, 'payload':"45.252,-77.233,65,110,60,90, date: " + date},
+        {'topic': receiverTopic, 'payload':"45.252,-65.543,53,109,60,90, date: " + date}]
 
 host = "localhost"
 
 def on_message(client, obj, msg):
-    print ("Datos recibidos",date,msg.payload.decode("utf-8"),sep = " ")
-    if msg.payload.decode("utf-8") == "1":
-        client.publish(receiverTopic, msgs)
+    if msg.payload.decode("utf-8") == "1" and msg.topic == alertTopic:
+        print ("Boton de Alerta Activado - ",date,sep = " ")
+        print ("A la espera de mensajes...")
+        publish.multiple(msgs, hostname = host)
+    elif msg.topic == alertTopic and msg.payload.decode("utf-8") == "2":
+        print ("Alerta desactivada, sensor pasa a standby")
+    else:
+        print(msg.payload.decode("utf-8"))
 
 
 
@@ -37,15 +46,6 @@ def on_connect(client, userdata, flags, rc):
           client.subscribe("Sistema/#")
           print("Conexion exitosa a Alertas")
 
-# def on_connectPub(client, userdata, flags, rc):
-#      print("Conexion exitosa al recibidor, esperando comando de activacion...")
-#      print("Conectado a... '"+str(flags)+"', '"+str(rc)+"'")
-#      if not flags["session present"]:
-#           print("Conectando al recibidor...")
-#           client.subscribe(receiverTopic)
-#           print("Conexion exitosa al recibidor")
-             
-      
 if __name__ == '__main__':
 
     client =  paho.Client()
