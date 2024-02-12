@@ -6,10 +6,9 @@
 """
 
 import paho.mqtt.client as paho
-import paho.mqtt.publish as publish
 import time
 import threading
-import queue
+
 
 
 """
@@ -20,46 +19,35 @@ localtimeFormated = time.localtime(localtime)
 date = str(localtimeFormated.tm_year)+"-"+str(localtimeFormated.tm_mon)+"-"+str(localtimeFormated.tm_mday)+" "+str(localtimeFormated.tm_hour)+":"+str(localtimeFormated.tm_min)+":"+str(localtimeFormated.tm_sec)
 receiverTopic = "Sistema/Receiver"
 alertTopic = "Sistema/Alert"
-msgs = [{'topic': receiverTopic, 'payload':"45.252,-75.541,95,120,60,90, date: " + date},
-        {'topic': receiverTopic, 'payload':"45.252,-73.343,85,110,60,90, date: " + date},
-        {'topic': receiverTopic, 'payload':"45.252,-77.233,65,110,60,90, date: " + date},
-        {'topic': receiverTopic, 'payload':"45.252,-65.543,53,109,60,90, date: " + date}]
+msg = "45.252,-75.541,95,120,60,90, date: " + date
 host = "localhost"
-Q = queue.Queue()
 
 def on_connect(client, userdata, flags, rc):
      print("Conexion exitosa al sistema, esperando comando de activacion...")
-     print("Conectado a... '"+str(flags)+"', '"+str(rc)+"'")
      if not flags["session present"]:
           print("Conectando al sistema de alertas...")
-          client.subscribe("Sistema/#")
+          client.subscribe("Sistema/Alert")
           print("Conexion exitosa a Alertas")
 
 def main():
         print("Espere...")
         while True:
-             global restart 
-             restart = False
-             if restart == True:
-                  break
-             else:
-                time.sleep(1)
-                publish.multiple(hostname=host,msgs=msgs)
-                continue
+            time.sleep(1)
+            client.publish(topic=receiverTopic,payload=msg)
+                
 
 def subscriber():
      client.on_message = on_message
      client.loop_forever()
 
-def on_message(client, obj, msg):
+def on_message(client: paho.Client , obj, msg):
     if msg.payload.decode("utf-8") == "1" and msg.topic == alertTopic:
         print ("Boton de Alerta Activado - ",date,sep = " ")
         print ("A la espera de mensajes...")
-        restart = True
+        client.subscribe(receiverTopic)
     elif msg.topic == alertTopic and msg.payload.decode("utf-8") == "2":
         print ("Alerta desactivada, sensor pasa a standby")
-        restart = False
-        #print(pub.is_alive(),sub.is_alive())
+        client.unsubscribe(receiverTopic)       
     else:
         print(msg.payload.decode("utf-8"))
 
