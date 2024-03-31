@@ -10,7 +10,7 @@ import time
 import threading
 import random
 import pymongo
-
+import json
 
 """
 Setting Messages and host
@@ -28,10 +28,6 @@ msgs = ["155215512354,41.252,-75.541,95,120,65,90," + date,
         "155215512354,41.222,-75.541,95,120,60,60,: " + date,
         "155215512354,45.242,-76.541,95,120,50,70,: " + date,]
 host = "localhost"
-
-
-
-
 
 def on_connect(client:paho.Client, userdata, flags, rc):
      print("Conexion exitosa al sistema, esperando comando de activacion...")
@@ -64,7 +60,11 @@ def insertImeiHistoryData(message:str):
 def getImeiHistoryData(imei:str):
      unit_history = collection.find({"imei":imei})
      for doc in unit_history:
-          print(doc)
+          print("Fecha: "+doc["date"]+
+                ", Coordenadas: "+doc["lat"]+", "+doc["lon"]+
+                ", Altitud: "+doc["altitude"]+
+                ", IMEI: "+doc["imei"]+
+                ", Velocidad: "+doc["speed"])
 
 def subscriber():
      client.on_message = on_message
