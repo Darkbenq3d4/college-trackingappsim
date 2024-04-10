@@ -10,7 +10,8 @@ import time
 import threading
 import random
 import pymongo
-import json
+import pymongo.errors
+import sys
 
 """
 Setting Messages and host
@@ -22,11 +23,18 @@ receiverTopic = "Sistema/Receiver"
 alertTopic = "Sistema/Alert"
 historyTopic = "Sistema/Historial"
 msgs = ["155215512354,41.252,-75.541,95,120,65,90," + date,
-        "155215512354,44.252,-73.541,95,120,60,30,: " + date,
-        "155215512354,43.252,-72.541,95,120,40,40,: " + date,
-        "155215512354,42.252,-71.541,95,120,70,20,: " + date,
-        "155215512354,41.222,-75.541,95,120,60,60,: " + date,
-        "155215512354,45.242,-76.541,95,120,50,70,: " + date,]
+        "155215512354,44.252,-73.541,95,120,60,30," + date,
+        "155215512354,43.252,-72.541,95,120,40,40," + date,
+        "155215512354,42.252,-71.541,95,120,70,20," + date,
+        "155215512354,41.222,-75.541,95,120,60,60," + date,
+        "155215512354,45.242,-76.541,95,120,50,70," + date]
+msgsC2 = [
+        "152245233645,41.252,-75.545,95,120,65,90," + date,
+        "152245233645,44.252,-73.541,95,120,60,30," + date,
+        "152245233645,43.252,-72.541,95,120,40,40," + date,
+        "152245233645,42.252,-71.545,95,120,70,20," + date,
+        "152245233645,41.222,-75.545,95,120,60,60," + date,
+        "152245233645,45.242,-76.541,95,120,50,70," + date]
 host = "localhost"
 
 def on_connect(client:paho.Client, userdata, flags, rc):
@@ -41,6 +49,10 @@ def main():
         while True:
             time.sleep(1)
             client.publish(topic=receiverTopic,payload=msgs[random.randrange(start=0,stop=5)])
+def mainC2():
+        while True:
+            time.sleep(1)
+            client.publish(topic=receiverTopic,payload=msgsC2[random.randrange(start=0,stop=5)])
                 
 def insertImeiHistoryData(message:str):
      #message_format "imeinumber,lat,lon,battSen,alt,vel,gradDir,date"
@@ -55,16 +67,26 @@ def insertImeiHistoryData(message:str):
            "direction_degree": msgFormat[6],
            "date": msgFormat[7]
            }
-      collection.insert_one(document=newDoc)
+      try:
+          with pymongo.timeout(10):
+               collection.insert_one(document=newDoc)
+      except pymongo.errors.PyMongoError as e:
+           if e.timeout:
+                print(f"El sistema ha tardado en conectarse a la base de datos!")
      
 def getImeiHistoryData(imei:str):
-     unit_history = collection.find({"imei":imei})
-     for doc in unit_history:
-          print("Fecha: "+doc["date"]+
-                ", Coordenadas: "+doc["lat"]+", "+doc["lon"]+
-                ", Altitud: "+doc["altitude"]+
-                ", IMEI: "+doc["imei"]+
-                ", Velocidad: "+doc["speed"])
+     try:
+          with pymongo.timeout(10):
+               unit_history = collection.find({"imei":imei})
+               for doc in unit_history:
+                    print("Fecha: "+doc["date"]+
+                         ", Coordenadas: "+doc["lat"]+", "+doc["lon"]+
+                         ", Altitud: "+doc["altitude"]+
+                         ", IMEI: "+doc["imei"]+
+                         ", Velocidad: "+doc["speed"])
+     except pymongo.errors.PyMongoError as e:
+          if e.timeout:
+               print(f"El sistema ha tardado en conectarse a la base de datos!")
 
 def subscriber():
      client.on_message = on_message
@@ -87,14 +109,21 @@ def on_message(client: paho.Client , obj, msg):
         insertImeiHistoryData(msg.payload.decode("utf-8"))
 
 if __name__ == '__main__':
+     try:
+          MonClient = pymongo.MongoClient("mongodb://localhost:27017") #Creando conexion local
+          db = MonClient["track_project_db"]
+          collection = db["imei_history"]
+          client =  paho.Client()
+          client.on_connect = on_connect
+          client.connect(host, 1883, 60)
+          sub = threading.Thread(target=subscriber,name="System")
+          c1 = threading.Thread(target=main, name= "Sensor1")
+          c2 = threading.Thread(target=mainC2,name="Sensor2")
+          sub.start()
+          c1.start()
+          c2.start()
+     except pymongo.errors.ConnectionFailure:
+          print("La base de datos esta caida, favor llamar al tecnico de sistema!")
+          sys.exit(1)
 
-    MonClient = pymongo.MongoClient("mongodb://localhost:27017") #Creando conexion local
-    db = MonClient["track_project_db"]
-    collection = db["imei_history"]
-    client =  paho.Client()
-    client.on_connect = on_connect
-    client.connect(host, 1883, 60)
-    sub = threading.Thread(target=subscriber,name="Sub")
-    pub = threading.Thread(target=main, name= "Pub")
-    sub.start()
-    pub.start()
+  
